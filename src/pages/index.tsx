@@ -157,19 +157,19 @@ export default function Home() {
                 <table style={{ width: '100%', color: 'white', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
+                      <th style={{ borderBottom: '1px solid white', padding: '8px' }}>ID</th>
                       <th style={{ borderBottom: '1px solid white', padding: '8px' }}>Title</th>
-                      <th style={{ borderBottom: '1px solid white', padding: '8px' }}>URL</th>
                     </tr>
                   </thead>
                   <tbody>
                     {papers.map((paper, index) => (
                       <tr key={index} style={{ fontWeight: paper.url === url ? 'bold' : 'normal' }}>
-                        <td style={{ borderBottom: '1px solid white', padding: '8px' }}>{paper.title}</td>
                         <td style={{ borderBottom: '1px solid white', padding: '8px' }}>
                           <a href={paper.url} target="_blank" rel="noopener noreferrer" style={{ color: 'white' }}>
-                            {paper.url}
+                            {paper.url.match(/\d+\.\d+/)?.[0] || 'N/A'}
                           </a>
                         </td>
+                        <td style={{ borderBottom: '1px solid white', padding: '8px' }}>{paper.title}</td>
                       </tr>
                     ))}
                   </tbody>
