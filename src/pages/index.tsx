@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { toast } from 'react-toastify';
 const APP_ID = "0x486dD3B9C8DF7c9b263C75713c79EC1cf8F592F2";
 const APP_SECRET = "0x1f86678fe5ec8c093e8647d5eb72a65b5b2affb7ee12b70f74e519a77b295887";
-const PROVIDER_ID = "952816de-91e4-4ca8-9c84-3a9df405a277";
+const ARXIV_PROVIDER_ID = "952816de-91e4-4ca8-9c84-3a9df405a277";
+const SCIENCE_PROVIDER_ID = "82d2434e-de91-4d91-820d-bb71c66f52dc";
 
 // Add new interface for parsed paper data
 interface ArxivPaper {
@@ -13,11 +14,24 @@ interface ArxivPaper {
   url: string;
 }
 
+interface SciencePaper {
+  articleUUID: string;
+  manuscriptNumber: string;
+  title: string;
+  firstAuthor: string;
+  correspondingAuthor: string;
+  publicationName: string;
+  status: string;
+  receivedDate: number;
+  publishedDate: number | string; // Since publishedDate can be an empty string
+}
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [qrUrl, setQrUrl] = useState("");
   const [step, setStep] = useState("input");
-  const [papers, setPapers] = useState<ArxivPaper[]>([]);
+  const [papers, setPapers] = useState<ArxivPaper[] | SciencePaper[]>([]);
+  const [platform, setPlatform] = useState<"arxiv" | "science" | null>(null);
 
 
   const parseArxivHtml = (htmlString: string) => {
@@ -53,13 +67,27 @@ export default function Home() {
     }
   };
 
-  const getVerificationReq = async () => {
+  const parseScienceHtml = (jsonString: string) => {
+    try {
+      console.log(jsonString);
+      const parsedData = JSON.parse(jsonString);
+      const articles = JSON.parse(parsedData.paramValues.allarticles);
+      
+      return articles;
+    } catch (error) {
+      console.error('Error parsing Science HTML:', error);
+      return [];
+    }
+  };
+
+  const getVerificationReqForAxiv = async () => {
     setStep("scan");
+    setPlatform("arxiv");
     try {
       const reclaimClient = await ReclaimProofRequest.init(
         APP_ID,
         APP_SECRET,
-        PROVIDER_ID,
+        ARXIV_PROVIDER_ID,
         { log: false, acceptAiProviders: true }
       );
       const requestUrl = await reclaimClient.getRequestUrl();
@@ -87,7 +115,47 @@ export default function Home() {
         },
       });
     } catch (error) {
-      console.error("Error in getVerificationReq", error);
+      console.error("Error in getVerificationReqForAxiv", error);
+    }
+  };
+
+
+  const getVerificationReqForScience = async () => {
+    setStep("scan");
+    setPlatform("science");
+    try {
+      const reclaimClient = await ReclaimProofRequest.init(
+        APP_ID,
+        APP_SECRET,
+        SCIENCE_PROVIDER_ID,
+        { log: false, acceptAiProviders: true }
+      );
+      const requestUrl = await reclaimClient.getRequestUrl();
+      const statusUrl = await reclaimClient.getStatusUrl();
+      console.log("requestUrl", requestUrl);
+      console.log("statusUrl", statusUrl);
+      setQrUrl(requestUrl);
+      await reclaimClient.startSession({
+        onSuccess: async (proof) => {
+          const htmlContent = (proof as Proof).claimData.parameters;
+          const extractedPapers = parseScienceHtml(htmlContent);
+          setPapers(extractedPapers);
+          
+          const isPaperOwner = extractedPapers.some((paper: SciencePaper) => paper.articleUUID === url.split('/').pop());
+          console.log(extractedPapers, isPaperOwner);
+          if (isPaperOwner) {
+            toast.success("You have successfully claimed that you're the owner of the paper.");
+          } else {
+            toast.error("You're not the owner of the paper.");
+          }
+        },
+        onError: (error) => {
+          toast.error("Verification failed");
+          console.log("error", error);
+        },
+      });
+    } catch (error) {
+      console.error("Error in getVerificationReqForAxiv", error);
     }
   };
 
@@ -135,7 +203,7 @@ export default function Home() {
             />
             <Button
               variant="contained"
-              onClick={getVerificationReq}
+              onClick={getVerificationReqForAxiv}
               sx={{
                 marginTop: 2,
                 bgcolor: '#4a90e2',
@@ -144,7 +212,22 @@ export default function Home() {
                 },
               }}
             >
-              Next
+              Arxiv
+            </Button>
+
+            <Button
+              variant="contained"
+              onClick={getVerificationReqForScience}
+              sx={{
+                marginTop: 2,
+                marginLeft: 2,
+                bgcolor: '#4a90e2',
+                '&:hover': {
+                  bgcolor: '#357abd',
+                },
+              }}
+            >
+              Science
             </Button>
           </>
         ) : (
@@ -154,26 +237,47 @@ export default function Home() {
                 <Typography variant="h6" gutterBottom>
                   Extracted Papers:
                 </Typography>
-                <table style={{ width: '100%', color: 'white', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ borderBottom: '1px solid white', padding: '8px' }}>ID</th>
-                      <th style={{ borderBottom: '1px solid white', padding: '8px' }}>Title</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {papers.map((paper, index) => (
-                      <tr key={index} style={{ fontWeight: paper.url === url ? 'bold' : 'normal' }}>
-                        <td style={{ borderBottom: '1px solid white', padding: '8px' }}>
-                          <a href={paper.url} target="_blank" rel="noopener noreferrer" style={{ color: 'white' }}>
-                            {paper.url.match(/\d+\.\d+/)?.[0] || 'N/A'}
-                          </a>
-                        </td>
-                        <td style={{ borderBottom: '1px solid white', padding: '8px' }}>{paper.title}</td>
+                {platform === "arxiv" ? (
+                  <table style={{ width: '100%', color: 'white', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ borderBottom: '1px solid white', padding: '8px' }}>ID</th>
+                        <th style={{ borderBottom: '1px solid white', padding: '8px' }}>Title</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {(papers as ArxivPaper[]).map((paper, index) => (
+                        <tr key={index} style={{ fontWeight: paper.url === url ? 'bold' : 'normal' }}>
+                          <td style={{ borderBottom: '1px solid white', padding: '8px' }}>
+                            <a href={paper.url} target="_blank" rel="noopener noreferrer" style={{ color: 'white' }}>
+                              {paper.url.match(/\d+\.\d+/)?.[0] || 'N/A'}
+                            </a>
+                          </td>
+                          <td style={{ borderBottom: '1px solid white', padding: '8px' }}>{paper.title}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table style={{ width: '100%', color: 'white', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ borderBottom: '1px solid white', padding: '8px' }}>Manuscript Number</th>
+                        <th style={{ borderBottom: '1px solid white', padding: '8px' }}>Title</th>
+                        <th style={{ borderBottom: '1px solid white', padding: '8px' }}>First Author</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(papers as SciencePaper[]).map((paper, index) => (
+                        <tr key={index} style={{ fontWeight: paper.articleUUID === url.split('/').pop() ? 'bold' : 'normal' }}>
+                          <td style={{ borderBottom: '1px solid white', padding: '8px' }}>{paper.manuscriptNumber}</td>
+                          <td style={{ borderBottom: '1px solid white', padding: '8px' }}>{paper.title}</td>
+                          <td style={{ borderBottom: '1px solid white', padding: '8px' }}>{paper.firstAuthor}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </Box>
             ) : (
               qrUrl.length > 0 ? (
