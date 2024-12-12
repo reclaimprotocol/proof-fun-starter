@@ -84,23 +84,35 @@ export default function Home() {
     setStep("scan");
     setPlatform("arxiv");
     try {
+      // Initialize the Reclaim client for ArXiv
+      // To get the APP_ID and APP_SECRET, you need to create a new app in the Reclaim dashboard
+      // The Arxiv Provider Id is in the 'Explore Providers' section of the dashboard
       const reclaimClient = await ReclaimProofRequest.init(
         APP_ID,
         APP_SECRET,
         ARXIV_PROVIDER_ID,
         { log: false, acceptAiProviders: true }
       );
+
+      // The requestUrl is the URL that the user needs to visit(through the QR code) to start the verification process
       const requestUrl = await reclaimClient.getRequestUrl();
-      const statusUrl = await reclaimClient.getStatusUrl();
       console.log("requestUrl", requestUrl);
+      // The statusUrl is the URL that the user can visit to check the status of the verification process
+      const statusUrl = await reclaimClient.getStatusUrl();
       console.log("statusUrl", statusUrl);
+      // Set the QR code URL to the requestUrl
       setQrUrl(requestUrl);
+      // Start the verification process
       await reclaimClient.startSession({
         onSuccess: async (proof) => {
+          // The proof is the proof that the user has successfully generated in the Verifier app
           const htmlContent = (proof as Proof).claimData.parameters;
+          // Parse the HTML content to get the papers
           const extractedPapers = parseArxivHtml(htmlContent);
+          // Set the papers to the extracted papers
           setPapers(extractedPapers);
           
+          // Check if the user is the owner of the paper
           const isPaperOwner = extractedPapers.some(paper => paper.url === url);
           console.log(extractedPapers, isPaperOwner);
           if (isPaperOwner) {
@@ -124,23 +136,33 @@ export default function Home() {
     setStep("scan");
     setPlatform("science");
     try {
+      // Initialize the Reclaim client for Science
+      // The Science Provider Id is in the 'Explore Providers' section of the dashboard
       const reclaimClient = await ReclaimProofRequest.init(
         APP_ID,
         APP_SECRET,
-        SCIENCE_PROVIDER_ID,
+        SCIENCE_PROVIDER_ID, // Notice the change in provider id.
         { log: false, acceptAiProviders: true }
       );
+      // The requestUrl is the URL that the user needs to visit(through the QR code) to start the verification process
       const requestUrl = await reclaimClient.getRequestUrl();
+      // The statusUrl is the URL that the user can visit to check the status of the verification process
       const statusUrl = await reclaimClient.getStatusUrl();
       console.log("requestUrl", requestUrl);
       console.log("statusUrl", statusUrl);
+      // Set the QR code URL to the requestUrl
       setQrUrl(requestUrl);
+      // Start the verification process
       await reclaimClient.startSession({
         onSuccess: async (proof) => {
+          // The proof is the proof that the user has successfully generated in the Verifier app
           const htmlContent = (proof as Proof).claimData.parameters;
+          // Parse the HTML content to get the papers
           const extractedPapers = parseScienceHtml(htmlContent);
+          // Set the papers to the extracted papers
           setPapers(extractedPapers);
           
+          // Check if the user is the owner of the paper
           const isPaperOwner = extractedPapers.some((paper: SciencePaper) => paper.articleUUID === url.split('/').pop());
           console.log(extractedPapers, isPaperOwner);
           if (isPaperOwner) {
